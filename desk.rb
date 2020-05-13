@@ -1,137 +1,137 @@
-require_relative('player')
+require_relative('interface')
 require_relative('deck')
+
 class Desk
-    # attr_reader :deck
+  TOTAL_SUM = 100
+  GAME_SUM = 10
+  
   def initialize
-    puts 'Новая игра'
-    puts 'Введите Ваше Имя:'
-    name = gets.chomp
-    @player = Player.new(name)
-    @diller = Player.new('diller')
-    # @diller1 = Player.new('diller1')
-    @deck = Deck.new()
+    @cards = Deck.generate
+    @player_cards = []
+    @diller_cards = []
+    @player_score = 0
+    @diller_score = 0
+    @player_steps = 0
+    @diller_steps = 0
+    @player_wallet = TOTAL_SUM
+    @player_name = Interface.greeting
+    @game_is_over = false
+    @game_status = :none
   end
-  def start
-    puts 'Начинаем, вот ваши две карты:'
-    # i=1
-    # 10.times { p @deck.card_get}
-    2.times { @player.cards = @deck.card_get }#; puts "#{@player.cards} #{i}";i+=1 }
-    2.times { @diller.cards = @deck.card_get }#; puts "#{@diller.cards} #{i}";i+=1 }
-    # 5.times { p @diller1.cards; @diller1.cards = @deck.card_get; puts "#{@diller1.cards} #{i}";i+=1 }
-    puts @player.cards
-    # puts @diller.cards
-    # puts @diller1.cards
-    @player.wallet -= 10
-    @diller.wallet -= 10
-    @player.steps = 2
-    @diller.steps = 2
-    @player.cards.each do |card|
-      # p card
-      #  p @deck.score_get(card)
-      # p '@deck.score_get(card)222222222222222222222222222222222222222222222222'
-      @player.score += @deck.score_get(card)
-    end
-    @diller.cards.each do |card|
-      # p card
-      # p @diller.score
-      # p @deck.score_get(card)
-      # p '@deck.score_get(card)111111111111111111111111111111111111111111111'
-      @diller.score += @deck.score_get(card)
-      # p @diller.score
-    end
-    loop do 
-      break if @diller.steps == 3 && @player.steps == 3
-      puts "У Вас #{@player.score} очков"
-      puts 'Сделайте Ваш выбор:'
-      puts '1  --  Пропустить'
-      puts '2  --  Добавить карту'
-      puts '3  --  Открыть карты'
-      chioce = gets.chomp.to_i
-      case chioce
-      when 1 #'1  --  Пропустить'
-        skip
-      when 2 #'2  --  Добавить карту'
+
+  def controller
+    start
+    loop do
+      resalt = Interface.player_current_choice
+      case resalt
+      when 1 #пропустить
+        diller_choice
+        break if @game_is_over
+        break if game_is_over_by_steps
+      when 2 #добавить
         add_card
-      when 3 #'3  --  Открыть карты'
-        open
-        break
+        break if @game_is_over
+        break if game_is_over_by_steps
+      when 3 #открыть
+        break 
+      end
+    end
+    Interface.whole_report(@player_cards, @player_score, @diller_cards, @diller_score)
+    game_over
+    players_clean
+  end
+
+  def players_clean
+    @cards = Deck.generate
+    @player_cards = []
+    @diller_cards = []
+    @game_is_over = false
+    @game_status = :none
+  end
+
+  def game_over
+    case @game_status
+    when :player_win
+      @player_wallet += GAME_SUM * 2
+      Interface.player_message_win(@player_wallet)
+    when :diller_win
+      Interface.diller_message_win(@player_wallet)
+    when :none
+      delta = @player_score - @diller_score
+      if delta > 0
+        @player_wallet += GAME_SUM * 2
+        Interface.player_message_win(@player_wallet)
+      elsif delta < 0 
+        Interface.diller_message_win(@player_wallet)
+      else
+        @player_wallet += GAME_SUM
+        Interface.draw(@player_wallet)
       end
     end
   end
 
-  def skip
-    if @diller.score > 17 
-      puts 'Диллер пропускает'
+  def game_finish
+    Interface.game_finish
+  end
+  def game_finish?
+    Interface.ask_player && @diller_score != TOTAL_SUM * 2 && @diller_score != 0
+  end
+
+  def game_is_over_by_steps
+    @player_steps == 3 && @diller_steps == 3
+  end
+
+  def diller_choice
+     if @diller_score > 17
+     Interface.diller_skip 
     else
-      card = @deck.card_get
-      @diller.cards = card
-      # p card
-      #  p @deck.score_get(card)
-      # p '@deck.score_get(card)33333333333333333333333333333333333333333333333333'
-      @diller.score += @deck.score_get(card)
-      @diller.steps += 1
-      puts 'Диллер взял карту'
+      @diller_cards << @cards.delete(@cards.sample)
+      @diller_score = score(@diller_cards)
+      @diller_steps += 1
+      Interface.diller_gets_card
+      if @diller_score > 21
+        @game_is_over = true 
+        @game_status = :player_win
+      end
     end
-    open if @diller.steps == 3 && @player.steps == 3
   end
 
   def add_card
-    if @player.steps > 3
-      puts 'Вы уже взяли три карты'
+    if @player_steps == 3
+      Interface.player_warning
     else
-      card = @deck.card_get
-      @player.cards = card
-      # p card
-      #  p @deck.score_get(card)
-      # p '@deck.score_get(card)444444444444444444444444444444444444444444444444'
-      @player.score += @deck.score_get(card)
-      puts "Ваша карта: #{card}, Ваши очки: #{@player.score}"
-      @player.steps += 1
+      @player_cards << @cards.delete(@cards.sample)
+      @player_score = score(@player_cards)
+      @player_steps += 1
+      Interface.player_current_state(@player_cards, @player_score)
+      if @player_score > 21
+        @game_is_over = true 
+        @game_status = :diller_win
+      end
     end
-    open if @diller.steps == 3 && @player.steps == 3
   end
 
-  def open
-    if @player.score > 21# || @player.score < @diller.score
-      puts 'Вы проиграли'
-      @diller.wallet += 20 
-    elsif @diller.score > 21 && @player.score <= 21
-       puts 'Вы выиграли'
-      @player.wallet += 20 
-    elsif @player.score > @diller.score
-      puts 'Вы выиграли'
-      @player.wallet += 20 
-    elsif @player.score < @diller.score
-      puts 'Вы проиграли'
-      @diller.wallet += 20 
-    else 
-      puts 'Ничья'
-      @diller.wallet += 10 
-      @player.wallet += 10 
+  def start
+    2.times do 
+      @player_cards << @cards.delete(@cards.sample)
+      @diller_cards << @cards.delete(@cards.sample)
     end
-    puts "Ваши карты: #{@player.cards}"
-    puts "Диллера карты: #{@diller.cards}"
-    puts "Ваши очки: #{@player.score_end}"
-    puts "Диллера очки: #{@diller.score_end}"
-    puts "Ваши деньги: #{@player.wallet}"
-    puts "Диллера деньги: #{@diller.wallet}"
-    puts "Ваши карты: #{@player.steps}"
-    puts "Диллера карты: #{@diller.steps}"
-    puts "В колоде #{quan}"
-    @player.cards_clean
-    @diller.cards_clean
+    @player_score = score(@player_cards)
+    @diller_score = score(@diller_cards)
+    @player_wallet -= GAME_SUM
+    @player_steps = 2
+    @diller_steps = 2
+    Interface.player_current_state(@player_cards, @player_score)
   end
 
-  def quan
-    puts @deck.deck_quan_cards
+  def score(cards)
+    amount = cards.map(&:to_i).sum
+    amount += cards.select { |card| %w[J Q K].include? card[0] }.count * 10
+    amount += cards.select { |card| ['A'].include? card[0] }.count * 11
+    count_aces = cards.select { |card| card[0] == 'A' }.count
+    count_aces.times do
+      amount -= 10 if amount > 21
+    end
+    amount
   end
-  # def deck_test
-  #   loop do 
-  #    card = @deck.card_get 
-  #    puts card
-  #    puts @deck.score_get(card)
-  #    puts quan
-  #    break if quan == 1
-  #   end
-  # end
 end

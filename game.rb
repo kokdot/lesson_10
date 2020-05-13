@@ -1,17 +1,8 @@
 require_relative('desk')
+require_relative('interface')
 game = Desk.new
-game.start
-loop do 
-  puts 'Продолжить игру:  1'
-  puts 'Выход:  2'
-  menu = gets.chomp.to_i
-  case menu
-  when 1
-# game = Desk.new
-    game.start
-    
-  when 2
-    break
-  end
+game.controller
+while game.game_finish? do 
+  game.controller
 end
-  puts 'Игра Закончена'
+game.game_finish
